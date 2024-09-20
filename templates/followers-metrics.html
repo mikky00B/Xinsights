@@ -1,0 +1,52 @@
+<!-- templates/trigger_task.html -->
+<form id="task-form" method="POST" action="{% url 'trigger_task' username='some_twitter_handle' %}">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+    <button type="submit">Fetch Twitter Data</button>
+</form>
+
+<div id="task-status"></div>
+
+<script>
+    const form = document.getElementById('task-form');
+    const statusDiv = document.getElementById('task-status');
+
+    form.onsubmit = function(event) {
+        event.preventDefault();  // Prevent normal form submission
+
+        fetch(form.action, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': form.querySelector('input[name="csrfmiddlewaretoken"]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            const taskId = data.task_id;
+            statusDiv.innerHTML = `Task Status: ${data.status} (Task ID: ${taskId})`;
+
+            // Poll for task status
+            checkTaskStatus(taskId);
+        })
+        .catch(error => {
+            statusDiv.innerHTML = 'Error starting task!';
+        });
+    }
+
+    function checkTaskStatus(taskId) {
+        fetch(`/check-task-status/${taskId}/`)
+            .then(response => response.json())
+            .then(data => {
+                statusDiv.innerHTML = `Task Status: ${data.status} (Task ID: ${data.task_id})`;
+
+                // If task is still pending, keep checking every 5 seconds
+                if (data.status !== 'SUCCESS' && data.status !== 'FAILURE') {
+                    setTimeout(() => checkTaskStatus(taskId), 5000);
+                }
+
+                // If task is complete, show the result
+                if (data.status === 'SUCCESS') {
+                    statusDiv.innerHTML += `<br>Result: ${JSON.stringify(data.result)}`;
+                }
+            });
+    }
+</script>
